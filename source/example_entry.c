@@ -1,4 +1,3 @@
-#include "irq.h"
 #include "lcd.h"
 
 void entry(){
