@@ -54,7 +54,9 @@ loop:
 	bl entry
 dummy:
 	b dummy
-
+irq:
+	subs pc, lr, $4
+/*
 irq:
         push {r0-r7, lr}
 	ldr r0, =intrTrace
@@ -74,21 +76,7 @@ keyboard:
 	str r1, [r0]
 	bl kIrqHandler
 	pop {r0-r7, lr}
-	subs pc, lr, $4
-.section .text
-.globl irqEnable
-irqEnable:
-	mrs r0, cpsr
-	bic r1, r0, $0b10000000
-	msr cpsr, r1
-	bx lr
-.globl irqDisable
-irqDisable:
-	mrs r0, cpsr
-	mov r2, $0b10000000
-	orr r2, r2, r0
-	msr cpsr, r0
-	bx lr
+	subs pc, lr, $4*/
 /*.globl main
 main:
 mainLoop:
