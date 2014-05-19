@@ -4,13 +4,16 @@ volatile int intrTrace;
 struct colour background = { 0, 0, 0 };
 struct colour font = { 0b111111, 0b111111, 0b111111 };
 
+void (*lcdExtEntryFunct)(void);
+void (*lcdExtExitFunct)(void);
+
 void lcdInit(int clock)
 {
 	intrTrace = 0;
 	spiInit(1, 1, clock);
 	lcdExtEntryFunct = dummy;
 	lcdExtExitFunct = dummy;
-	setGpioFunct(25, OUTPUT);
+	setGpioFunct(25, GPOUTPUT);
 
 	setPin(25);
 	wait(10000);
@@ -23,7 +26,7 @@ void lcdInit(int clock)
 	lcdRegWrite(0x00, 0x0000);
 	lcdRegWrite(0x01, 0x0);	/* Driver Output control */
 	lcdRegWrite(0x02, (1 << 10));	/* LCD Driver Waveform control */
-	lcdRegWrite(0x03, (1 << 15) | (1 << 14) | (1 << 5) | (1 << 12) | (1 << 4) | (1 << 3));	/* Set the scan moe */
+	lcdRegWrite(0x03, (1 << 15) | (1 << 14) | (1 << 12) | (1 << 5) | (1 << 4) | (1 << 3));	/* Set the scan moe */
 	lcdRegWrite(0x04, 0x0000);	/* Scalling control */
 	lcdRegWrite(0x08, 0x0202);	/* Display control 2 */
 	lcdRegWrite(0x09, 0x0000);	/* Display control 3 */
@@ -142,8 +145,9 @@ void lcdSetWindow(unsigned short int hsa, unsigned short int hea, unsigned short
 	} while (intrTrace == 1);
 }
 
-void lcdPrint(const char *str, int x, int y){
+void lcdPrint(int x, int y, const char *str){
 	int i;
+	lcdRegWrite(0x03, (1 << 15) | (1 << 14) | (1 << 12) | (7 << 3));
         for(i=0;str[i]!='\0';i++){
                 if(y+(WIDTH*(i+1))<=320)
                         lcdDrawChar(x, y+(WIDTH*i), str[i]);
@@ -157,12 +161,12 @@ void lcdPrint(const char *str, int x, int y){
 	of red and blue is cut				*/
 void lcdPixelsDraw(unsigned int amount, unsigned char red, unsigned char green, unsigned char blue)
 {
-	lcdOpenGRAM();
 	int i = 0;
 	red = red >> 1;
 	blue = blue >> 1;
 	unsigned char upper = (red << 3) + (green >> 3);
 	unsigned char lower = (green << 5) + blue;
+	lcdOpenGRAM();
 	for (i = 0; i < amount; i++) {
 		spiDataIO(upper);
 		spiDataIO(lower);
@@ -176,42 +180,93 @@ void lcdDrawChar(unsigned short int x, unsigned short int y, char character)
 	char tmp;
 	int z = (int)character;
 	z -= 32;
-	if(z>94) z='A'-32;
+	if(z>94) z='E'-32;
 	/*
 	 * WIDTH*HEIGHT/8 - amount of bytes describing
 	 * 1 character
 	 * z=z*amount - bytes to skip
 	 */
 	z *= WIDTH * HEIGHT / 8;
-
+	unsigned char bUpper = ((background.red>>1)<<3) + (background.green>>3);
+	unsigned char bLower = (background.green<<5) + (background.blue>>1);
+	unsigned char fUpper = ((font.red>>1)<<3) + (font.green>>3);
+	unsigned char fLower = (font.green<<5) + (font.blue>>1);
 	lcdExtEntryFunct();
 	lcdSetWindow(x, x + HEIGHT - 1, y, y + WIDTH - 1);
 	lcdSetCursor(x, y);
 	lcdOpenGRAM();
 	int i, k;
+	/* pure nonsense to use shifting function here
+	   instead of shifting it on first
+	   */
 	for (i = 0; i < (WIDTH * HEIGHT / 8); i++) {
 		tmp = FONT_NAME[OFFSET + z + i];
 		for (k = 7; k >= 0; k--) {
-			if (!(tmp & (1 << k)))
-				lcdPixelsWrite(background.red, background.green, background.blue);
-			else
-				lcdPixelsWrite(font.red, font.green, font.blue);
+			if (!(tmp & (1 << k))){
+				spiDataIO(bUpper);
+				spiDataIO(bLower);
+				spiWaitTilDone();
+			}
+			else{
+				spiDataIO(fUpper);
+				spiDataIO(fLower);
+				spiWaitTilDone();
+			}
 		}
 	}
 	lcdCloseGRAM();
 	lcdExtExitFunct();
 }
-
+void lcdDrawCharC(unsigned short int x, unsigned short int y, char character, struct colour *b, struct colour *f) 
+{
+	char tmp;
+	int z = (int)character;
+	z -= 32;
+	if(z>94) z='E'-32;
+	/*
+	 * WIDTH*HEIGHT/8 - amount of bytes describing
+	 * 1 character
+	 * z=z*amount - bytes to skip
+	 */
+	z *= WIDTH * HEIGHT / 8;
+	unsigned char bUpper = ((b->red>>1)<<3) + (b->green>>3);
+	unsigned char bLower = (b->green<<5) + (b->blue>>1);
+	unsigned char fUpper = ((f->red>>1)<<3) + (f->green>>3);
+	unsigned char fLower = (f->green<<5) + (f->blue>>1);
+	lcdExtEntryFunct();
+	lcdSetWindow(x, x + HEIGHT - 1, y, y + WIDTH - 1);
+	lcdSetCursor(x, y);
+	lcdOpenGRAM();
+	int i, k;
+	/* pure nonsense to use shifting function here
+	   instead of shifting it on first
+	   */
+	for (i = 0; i < (WIDTH * HEIGHT / 8); i++) {
+		tmp = FONT_NAME[OFFSET + z + i];
+		for (k = 7; k >= 0; k--) {
+			if (!(tmp & (1 << k))){
+				spiDataIO(bUpper);
+				spiDataIO(bLower);
+				spiWaitTilDone();
+			}
+			else{
+				spiDataIO(fUpper);
+				spiDataIO(fLower);
+				spiWaitTilDone();
+			}
+		}
+	}
+	lcdCloseGRAM();
+	lcdExtExitFunct();
+}
 void lcdFillWindow(unsigned short int hsa, unsigned short int hea, unsigned short int vsa, unsigned short int vea, unsigned char red, unsigned char green, unsigned char blue){
-	do{
-		intrTrace = 0;
-		lcdSetWindow(hsa, hea, vsa, vea);
-		lcdSetCursor(hsa, vsa);
-		lcdPixelsDraw((hea - hsa + 1) * (vea - vsa + 1), red, green, blue);
-	} while (intrTrace == 1);
+	lcdExtEntryFunct();
+	lcdSetWindow(hsa, hea, vsa, vea);
+	lcdSetCursor(hsa, vsa);
+	lcdPixelsDraw((hea - hsa + 1) * (vea - vsa + 1), red, green, blue);
+	lcdExtExitFunct();
 }
 
-/*	secondary IRQ disable (not in CPSR)	*/
 void dummy(void){
 	return;
 }

@@ -1,5 +1,11 @@
+#ifndef _GPIO_H
+#define _GPIO_H
 #include "gpio.h"
+#endif
+#ifndef _SPI_H
+#define _SPI_H
 #include "spi.h"
+#endif
 
 /*	LCD START CODES     */
 #define INDEX_WRITE     0x70	//0b01110000
@@ -11,18 +17,19 @@
 #define WIDTH   	16	//24
 #define OFFSET  	4
 #define FONT_NAME	Sinclair_Inverted_M
+#define FONT_SIZE	3044
 
 struct colour{
         unsigned char red;
-        unsigned char blue;
         unsigned char green;
+        unsigned char blue;
 };
 
 extern struct colour background;
 extern struct colour font;
 
-void (*lcdExtEntryFunct)(void);
-void (*lcdExtExitFunct)(void);
+extern void (*lcdExtEntryFunct)(void);
+extern void (*lcdExtExitFunct)(void);
 /*
 	These will be called
 	on entry or exit of critical segments
@@ -33,16 +40,19 @@ extern volatile int intrTrace;
 	work, all procedure will be repeated.
 */
 
-extern unsigned char Sinclair_Inverted_M[3044];
+extern unsigned char FONT_NAME[FONT_SIZE];
 
 void lcdInit(int);
 void lcdRegWrite(unsigned char, unsigned short int);
 unsigned short int lcdRegRead(unsigned char index);
 void lcdDrawChar(unsigned short int x, unsigned short int y, char character);
+void lcdDrawCharC(unsigned short int x, unsigned short int y, char character, struct colour *b, struct colour *f); 
 void lcdOpenGRAM(void);
 void lcdCloseGRAM(void);
 void lcdSetWindow(unsigned short int hsa, unsigned short int hea, unsigned short int vsa, unsigned short int vea);
-void lcdPrint(const char *str, int x, int y);
+void lcdPrint(int x, int y, const char *str);
+void lcdFillWindow(unsigned short int hsa, unsigned short int hea, unsigned short int vsa, unsigned short int vea, unsigned char red, unsigned char green, unsigned char blue);
+void lcdPixelsDraw(unsigned int amount, unsigned char red, unsigned char green, unsigned char blue);
 void dummy(void);
 static inline void lcdDisplayON(void);
 static inline void lcdSetCursor(unsigned short int, unsigned short int);
